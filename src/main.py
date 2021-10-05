@@ -27,7 +27,15 @@ while T_N2O[-1] < T_end and t < 10000:
     a_N2O   = (m_tot / V_tot - rho_V_N2O[-1]) / (rho_L_N2O[-1] - rho_V_N2O[-1])
     m_V_N2O = (1 - a_N2O[-1]) * rho_V_N2O[-1] * V_tot
     m_L_N2O = a_N2O[-1] * rho_L_N2O[-1] * V_tot
-    Q_vap   = (h_V_N2O[-1]-h_L_N2O[-1]-(p_N2O[-2]-p_N2O[-1])/rho_V_N2O[-2])*(m_L_N2O[-2]-m_L_N2O[-1])
+
+    dm = (m_L_N2O[-2]-m_L_N2O[-1])
+    dh = h_V_N2O[-1]-h_L_N2O[-1]
+
+    dH = dm*dh
+
+    dp = (p_N2O[-2]-p_N2O[-1])
+
+    Q_vap   = dH - dp/rho_V_N2O[-2]*dm
 
 
 # Press the green button in the gutter to run the script.
