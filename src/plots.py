@@ -2,6 +2,13 @@ import matplotlib.pyplot as plt
 
 
 def panel(*args):
+    """
+    Panel plot.
+
+    :param args: List with 2 lists inside: the X and Y values of each plot.
+
+    :type args: list of list
+    """
 
     fs = 10  # sets the fontsize
 
