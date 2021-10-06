@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib as mpl
+mpl.use('Qt5Agg')
 from matplotlib import pyplot as plt
 
 
@@ -9,18 +11,19 @@ class Tank():
         self.k_a = k_alu
         self.t_a = t_alu
         self.A = A
-        self.m = 174       # kg
-        self.V = 0.259      # m3
+        self.m = 174  # kg
+        self.V = 0.259  # m3
 
 
 class Lamp():
-    def __init__(self, eps, Temp):
+    def __init__(self, eps, Temp, shape_factor):
         self.eps = eps
         self.T = Temp
+        self.shape_factor = shape_factor
         self.sig = 5.67e-8
 
 
-# dummy class 
+# dummy class
 class N2O():
     def __init__(self):
         self.rho = 300
@@ -28,27 +31,28 @@ class N2O():
 
 
 class Thermals():
-    def __init__(self, tank, lamp, n2o, T, dt, T_amb):
+    def __init__(self, tank, lamp, n2o, T, dt, T_amb, evap=False):
         self.tank = tank
         self.lamp = lamp
         self.n2o = n2o
         self.T = T
-        self.dt = dt 
+        self.dt = dt
         self.T_amb = T_amb
+        self.evap = evap
 
     def thermal_res(self, T):
-        h_r = 4 * self.lamp.eps * self.lamp.sig * ((T + self.lamp.T)/2)**3
-        R = (1/h_r + self.tank.t_c/self.tank.k_c + self.tank.t_a/self.tank.k_a) * 1/self.tank.A
-        
+        h_r = 4 * self.lamp.eps * self.lamp.sig * self.lamp.shape_factor * ((T + self.lamp.T) / 2) ** 3
+        R = (1 / h_r + self.tank.t_c / self.tank.k_c + self.tank.t_a / self.tank.k_a) * 1 / self.tank.A
+
         return R
 
     def get_fluid_properties(self, T):
-        vap_frac = self.n2o.vap_mass_frac(T)            # mass fraction of vapor
-        #mass_frac = self.n2o.m_V(T)/self.n2o.m_L(T)
-        #print(vap_frac, mass_frac)
-        rho = (1-vap_frac) * self.n2o.rho_V(T) + vap_frac * self.n2o.rho_L(T) 
-        cp = (1-vap_frac) * self.n2o.cp_V(T) + vap_frac * self.n2o.cp_L(T) 
-        
+        vap_frac = self.n2o.vap_mass_frac(T)  # mass fraction of vapor for mass averaged density and Cp
+        # mass_frac = self.n2o.m_V(T)/self.n2o.m_L(T)
+        # print(vap_frac)
+        rho = (1 - vap_frac) * self.n2o.rho_V(T) + vap_frac * self.n2o.rho_L(T)
+        cp = (1 - vap_frac) * self.n2o.cp_V(T) + vap_frac * self.n2o.cp_L(T)
+
         return rho, cp, vap_frac
 
     def runge_kutta4(self, cutoff):
@@ -121,20 +125,20 @@ class Thermals():
             self.T_tank[i]  = self.T_tank[i-1]  + 1/6*(k1a + k2a/2 + k3a/2 + k4a)
             self.dT_tank[i] = self.dT_tank[i-1] + 1/6*(k1b + k2b/2 + k3b/2 + k4b)
 
-            print('================')
-            print('Euler')
-            print(self.dt * f(T_tank=self.T_tank[i - 1],
-                              vap_frac0=self.vap_frac[i - 1],
-                              T_lamp=self.lamp.T,
-                              thermal_res=self.thermal_res,
-                              tank=self.tank,
-                              n2o=self.n2o))
-            print('================')
-            print('Runge Kutta')
-            print(1/6*(k1a + k2a/2 + k3a/2 + k4a))
-            print('================')
-            # print(self.dT_tank[i])
-            print('\n\n')
+            # print('================')
+            # print('Euler')
+            # print(self.dt * f(T_tank=self.T_tank[i - 1],
+            #                   vap_frac0=self.vap_frac[i - 1],
+            #                   T_lamp=self.lamp.T,
+            #                   thermal_res=self.thermal_res,
+            #                   tank=self.tank,
+            #                   n2o=self.n2o))
+            # print('================')
+            # print('Runge Kutta')
+            # print(1/6*(k1a + k2a/2 + k3a/2 + k4a))
+            # print('================')
+            # # print(self.dT_tank[i])
+            # print('\n\n')
 
             self.rho_n2o[i], self.cp_n2o[i], self.vap_frac[i] = self.get_fluid_properties(self.T_tank[i-1])
 
@@ -144,7 +148,7 @@ class Thermals():
 
     def forward_euler(self, cutoff):
         self.time = np.arange(0, self.T, self.dt)
-        self.T_tank = np.ones(len(self.time))*288
+        self.T_tank = np.ones(len(self.time)) * self.T_amb
         self.rho_n2o = np.ndarray(len(self.time))
         self.cp_n2o = np.ndarray(len(self.time))
         self.vap_frac = np.ndarray(len(self.time))
@@ -153,33 +157,24 @@ class Thermals():
         self.rho_n2o[0], self.cp_n2o[0], self.vap_frac[0] = self.get_fluid_properties(self.T_tank[0])
 
         for i in range(1, len(self.time)):
+            R = self.thermal_res(self.T_tank[i - 1])
+            deltaT = self.lamp.T - self.T_tank[i - 1]
 
-            print(f'{(i/len(self.time)*100):.2f}%')
+            self.rho_n2o[i], self.cp_n2o[i], self.vap_frac[i] = self.get_fluid_properties(self.T_tank[i - 1])
 
-            R = self.thermal_res(self.T_tank[i-1])
-            deltaT = self.lamp.T - self.T_tank[i-1]
+            evap_mass = (self.vap_frac[i] - self.vap_frac[i - 1]) * self.tank.m
 
-            self.rho_n2o[i], self.cp_n2o[i], self.vap_frac[i] = self.get_fluid_properties(self.T_tank[i-1])
-            
-            evap_mass = (self.vap_frac[i] - self.vap_frac[i-1]) * self.tank.m
-            Q_evap = self.n2o.hvap * evap_mass
+            if self.evap:
+                Q_evap = self.n2o.hvap * evap_mass
 
-            self.T_tank[i] = self.T_tank[i-1] + self.dt * ((deltaT/R - Q_evap) / self.rho_n2o[i] / self.cp_n2o[i] / self.tank.V)
+            else:
+                Q_evap = 0
+
+            # Q_conv = self.conv_heat_transfer(self.T_tank[i-1])
+
+            self.T_tank[i] = self.T_tank[i - 1] + self.dt * (
+                        (deltaT / R - Q_evap) * 1 / self.rho_n2o[i] / self.cp_n2o[i] / self.tank.V)
 
             if self.n2o.p(self.T_tank[i]) > cutoff:
                 print('max pressure reached after: ', self.time[i], ' seconds')
                 break
-
-
-if __name__ == '__main__':
-
-    tank = Tank(20, 2e-3, 200, 3e-3, 4)
-    lamp = Lamp(0.6, 400)
-    n2o = N2O()
-    thermals = Thermals(tank, lamp, n2o, 3600, 10, 288)
-    thermals.forward_euler()
-
-    plt.plot(thermals.time, thermals.T_tank)
-    plt.xlabel('time [s]')
-    plt.ylabel('temp [K]')
-    plt.show()
