@@ -157,6 +157,9 @@ class Thermals():
         self.rho_n2o[0], self.cp_n2o[0], self.vap_frac[0] = self.get_fluid_properties(self.T_tank[0])
 
         for i in range(1, len(self.time)):
+
+            print(f'%{(i/len(self.time)*100):.2f}')
+
             R = self.thermal_res(self.T_tank[i - 1])
             deltaT = self.lamp.T - self.T_tank[i - 1]
 
