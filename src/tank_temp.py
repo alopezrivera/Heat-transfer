@@ -1,183 +1,124 @@
+import time
+import datetime
 import numpy as np
-import matplotlib as mpl
-mpl.use('Qt5Agg')
-from matplotlib import pyplot as plt
+
+from src import constants as c
 
 
 class Tank():
-    def __init__(self, k_carbon, t_carbon, k_alu, t_alu, A):
-        self.k_c = k_carbon
-        self.t_c = t_carbon
-        self.k_a = k_alu
-        self.t_a = t_alu
-        self.A = A
-        self.m = 174  # kg
-        self.V = 0.259  # m3
+    def __init__(self):
+        self.k_c = c.k_cf
+        self.t_c = c.t_cf
+        self.k_a = c.k_alu
+        self.t_a = c.t_alu
+        self.A   = c.S
+        self.m   = c.m_tot  # kg
+        self.V   = c.V_tot  # m3
 
 
 class Lamp():
-    def __init__(self, eps, Temp, shape_factor):
-        self.eps = eps
-        self.T = Temp
-        self.shape_factor = shape_factor
-        self.sig = 5.67e-8
+    def __init__(self):
+        self.eps          = c.emissivity
+        self.T            = c.lamp_temp
+        self.shape_factor = c.shape_factor
 
 
 # dummy class
 class N2O():
     def __init__(self):
-        self.rho = 300
-        self.cp = 1000
+        self.rho = c.N20_rho
+        self.cp  = c.N20_cp
 
 
 class Thermals():
     def __init__(self, tank, lamp, n2o, T, dt, T_amb, evap=False):
-        self.tank = tank
-        self.lamp = lamp
-        self.n2o = n2o
-        self.T = T
-        self.dt = dt
+        self.tank  = tank
+        self.lamp  = lamp
+        self.n2o   = n2o
+        self.T     = T
+        self.dt    = dt
         self.T_amb = T_amb
-        self.evap = evap
-
-    def thermal_res(self, T):
-        h_r = 4 * self.lamp.eps * self.lamp.sig * self.lamp.shape_factor * ((T + self.lamp.T) / 2) ** 3
-        R = (1 / h_r + self.tank.t_c / self.tank.k_c + self.tank.t_a / self.tank.k_a) * 1 / self.tank.A
-
-        return R
+        self.evap  = evap
 
     def get_fluid_properties(self, T):
         vap_frac = self.n2o.vap_mass_frac(T)  # mass fraction of vapor for mass averaged density and Cp
         # mass_frac = self.n2o.m_V(T)/self.n2o.m_L(T)
         # print(vap_frac)
         rho = (1 - vap_frac) * self.n2o.rho_V(T) + vap_frac * self.n2o.rho_L(T)
-        cp = (1 - vap_frac) * self.n2o.cp_V(T) + vap_frac * self.n2o.cp_L(T)
+        cp  = (1 - vap_frac) * self.n2o.cp_V(T) + vap_frac * self.n2o.cp_L(T)
 
         return rho, cp, vap_frac
 
-    def runge_kutta4(self, cutoff):
-        self.time = np.arange(0, self.T, self.dt)
+    def P_in(self, T, T_lamp):
+        h_r = 4 * self.lamp.eps * c.sigma * self.lamp.shape_factor * ((T + self.lamp.T) / 2) ** 3
+        R = (1 / h_r + self.tank.t_c / self.tank.k_c + self.tank.t_a / self.tank.k_a) * 1 / self.tank.A
 
-        self.T_tank = np.ones(len(self.time))
-        self.dT_tank = np.ones(len(self.time))
+        dT = T_lamp - T
 
-        self.rho_n2o = np.ndarray(len(self.time))
-        self.cp_n2o = np.ndarray(len(self.time))
+        return dT/R
+
+    def Q_radiated(self):
+        pass
+
+    def forward_euler(self, cutoff):
+
+        t0 = time.time()
+
+        self.time     = np.arange(0, self.T, self.dt)
+        self.T_tank   = np.ones(len(self.time)) * self.T_amb
+        self.rho_n2o  = np.ndarray(len(self.time))
+        self.cp_n2o   = np.ndarray(len(self.time))
         self.vap_frac = np.ndarray(len(self.time))
 
-        # Initialization
-        self.T_tank *= self.T_amb
+        self.T_tank[0] = self.n2o.T0
         self.rho_n2o[0], self.cp_n2o[0], self.vap_frac[0] = self.get_fluid_properties(self.T_tank[0])
 
         def f(T_tank, vap_frac0,
-              thermal_res,
-              T_lamp, tank, n2o
+              T_lamp, tank, n2o,
+              P_in,
+              dt,
+              evap,
+              log=False
               ):
-
-            R         = thermal_res(T_tank)
-            deltaT    = T_lamp - T_tank
 
             rho_n2o1, cp_n2o1, vap_frac1 = self.get_fluid_properties(T_tank)
 
-            evap_mass = (vap_frac1 - vap_frac0) * tank.m
-            Q_evap    = n2o.hvap * evap_mass
+            # Incoming power
+            p_in = P_in(T=T_tank, T_lamp=T_lamp)
 
-            dT_tank   = (deltaT/R - Q_evap) / (rho_n2o1*cp_n2o1*tank.V)
+            # Radiated power
+            p_rad = dt*c.sigma*((T_tank)**4-c.T_amb**4)*c.S
+
+            # Vaporization power
+            evap_mass = (vap_frac1 - vap_frac0) * tank.m
+            p_evap = dt*n2o.hvap * evap_mass if evap else 0
+
+            dT_tank = (p_in - p_evap - p_rad) / (rho_n2o1 * cp_n2o1 * tank.V)
+
+            if log:
+                print(f'{(p_in - p_evap - p_rad):.3f} [kW]')
+                print(f'{dT_tank:.3f} [K]')
 
             return dT_tank
 
         for i in range(1, len(self.time)):
 
-            print(f'{(i / len(self.time) * 100):.2f}%')
-
-            k1a = self.dt * self.dT_tank[i-1]
-            k1b = self.dt * f(T_tank=self.T_tank[i - 1],
-                              vap_frac0=self.vap_frac[i - 1],
-                              T_lamp=self.lamp.T,
-                              thermal_res=self.thermal_res,
-                              tank=self.tank,
-                              n2o=self.n2o)
-
-            k2a = self.dt * (self.dT_tank[i-1]+k1b/2)
-            k2b = self.dt * f(T_tank=self.T_tank[i - 1] + k1a/2,
-                              vap_frac0=self.vap_frac[i - 1],
-                              T_lamp=self.lamp.T,
-                              thermal_res=self.thermal_res,
-                              tank=self.tank,
-                              n2o=self.n2o)
-
-            k3a = self.dt * (self.dT_tank[i-1]+k2b/2)
-            k3b = self.dt * f(T_tank=self.T_tank[i - 1] + k2a/2,
-                              vap_frac0=self.vap_frac[i - 1],
-                              T_lamp=self.lamp.T,
-                              thermal_res=self.thermal_res,
-                              tank=self.tank,
-                              n2o=self.n2o)
-
-            k4a = self.dt * (self.dT_tank[i-1]+k3b)
-            k4b = self.dt * f(T_tank=self.T_tank[i - 1] + k3a,
-                              vap_frac0=self.vap_frac[i - 1],
-                              T_lamp=self.lamp.T,
-                              thermal_res=self.thermal_res,
-                              tank=self.tank,
-                              n2o=self.n2o)
-
-            self.T_tank[i]  = self.T_tank[i-1]  + 1/6*(k1a + k2a/2 + k3a/2 + k4a)
-            self.dT_tank[i] = self.dT_tank[i-1] + 1/6*(k1b + k2b/2 + k3b/2 + k4b)
-
-            # print('================')
-            # print('Euler')
-            # print(self.dt * f(T_tank=self.T_tank[i - 1],
-            #                   vap_frac0=self.vap_frac[i - 1],
-            #                   T_lamp=self.lamp.T,
-            #                   thermal_res=self.thermal_res,
-            #                   tank=self.tank,
-            #                   n2o=self.n2o))
-            # print('================')
-            # print('Runge Kutta')
-            # print(1/6*(k1a + k2a/2 + k3a/2 + k4a))
-            # print('================')
-            # # print(self.dT_tank[i])
-            # print('\n\n')
-
-            self.rho_n2o[i], self.cp_n2o[i], self.vap_frac[i] = self.get_fluid_properties(self.T_tank[i-1])
-
-            if self.n2o.p(self.T_tank[i]) > cutoff:
-                print('max pressure reached after: ', self.time[i], ' seconds')
-                break
-
-    def forward_euler(self, cutoff):
-        self.time = np.arange(0, self.T, self.dt)
-        self.T_tank = np.ones(len(self.time)) * self.T_amb
-        self.rho_n2o = np.ndarray(len(self.time))
-        self.cp_n2o = np.ndarray(len(self.time))
-        self.vap_frac = np.ndarray(len(self.time))
-
-        self.T_tank[0] = self.T_amb
-        self.rho_n2o[0], self.cp_n2o[0], self.vap_frac[0] = self.get_fluid_properties(self.T_tank[0])
-
-        for i in range(1, len(self.time)):
-
             print(f'%{(i/len(self.time)*100):.2f}')
 
-            R = self.thermal_res(self.T_tank[i - 1])
-            deltaT = self.lamp.T - self.T_tank[i - 1]
-
-            self.rho_n2o[i], self.cp_n2o[i], self.vap_frac[i] = self.get_fluid_properties(self.T_tank[i - 1])
-
-            evap_mass = (self.vap_frac[i] - self.vap_frac[i - 1]) * self.tank.m
-
-            if self.evap:
-                Q_evap = self.n2o.hvap * evap_mass
-
-            else:
-                Q_evap = 0
-
-            # Q_conv = self.conv_heat_transfer(self.T_tank[i-1])
-
-            self.T_tank[i] = self.T_tank[i - 1] + self.dt * (
-                        (deltaT / R - Q_evap) * 1 / self.rho_n2o[i] / self.cp_n2o[i] / self.tank.V)
+            self.T_tank[i] = self.T_tank[i-1] + self.dt*f(T_tank=self.T_tank[i-1],
+                                                          vap_frac0=self.vap_frac[i - 1],
+                                                          T_lamp=self.lamp.T,
+                                                          P_in=self.P_in,
+                                                          dt=self.dt,
+                                                          tank=self.tank,
+                                                          n2o=self.n2o,
+                                                          evap=self.evap)
 
             if self.n2o.p(self.T_tank[i]) > cutoff:
-                print('max pressure reached after: ', self.time[i], ' seconds')
+
+                runtime = time.time()
+
+                print('max pressure reached after  :: ', f'[h:m:s]  {str(datetime.timedelta(seconds=self.time[i]))}')
+                print('run time                    :: ', f'[s]      {runtime - t0:.2f}')
+
                 break

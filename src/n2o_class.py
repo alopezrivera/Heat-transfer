@@ -2,23 +2,55 @@ import numpy as np
 from scipy import interpolate
 from matplotlib import pyplot as plt
 
+from src import constants as c
+
 
 class N2O:
     def __init__(self):
-        self.T_c = 309.57   # K
-        self.p_c = 7251.    # kPa
-        self.rho_c = 452.   # kg/m3
-        self.m = 174.       # kg
-        self.V = 0.259      # m3
-        self.hvap = 375e3   # J/kg      https://webbook.nist.gov/cgi/cbook.cgi?ID=C10024972&Mask=4
+        self.T_c   = 309.57    # K
+        self.T0    = c.N2O_T0  # K
+        self.p_c   = 7251.     # kPa
+        self.rho_c = 452.      # kg/m3
+        self.m     = c.m_tot   # kg
+        self.V     = c.V_tot   # m3
+        self.hvap  = 375e3     # J/kg      https://webbook.nist.gov/cgi/cbook.cgi?ID=C10024972&Mask=4
 
     def vap_mass_frac(self, T):
         # from SIII diptube calc
         # linear extrapolation
         # use this to check results
 
-        temp = np.array([287,288,289,290,291,292,293,294,295,296,297,298,299,300,301])
-        vap_frac_arr = np.array([0.0343,0.0356,0.037,0.0384,0.0399,0.0415,0.0431,0.0449,0.0468,0.0488,0.051,0.0533,0.0558,0.0585,0.0615])
+        temp = np.array([287,
+                         288,
+                         289,
+                         290,
+                         291,
+                         292,
+                         293,
+                         294,
+                         295,
+                         296,
+                         297,
+                         298,
+                         299,
+                         300,
+                         301])
+        vap_frac_arr = np.array([0.0343,
+                                 0.0356,
+                                 0.037,
+                                 0.0384,
+                                 0.0399,
+                                 0.0415,
+                                 0.0431,
+                                 0.0449,
+                                 0.0468,
+                                 0.0488,
+                                 0.051,
+                                 0.0533,
+                                 0.0558,
+                                 0.0585,
+                                 0.0615])
+
         f = interpolate.interp1d(temp, vap_frac_arr, fill_value='extrapolate')
 
         vap_frac = f(T)

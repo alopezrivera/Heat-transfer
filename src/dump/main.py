@@ -5,9 +5,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from src.methods import p, rho_V, rho_L, cp_V, cp_L, h_V, h_L, Q_rad
+from src.dump.methods import p, rho_V, rho_L, cp_V, cp_L, h_V, h_L, Q_rad
 
-from src.constants import m_tot, V_tot, T_end, t, T_cf, Q_in, cp_cf, m_cf, S, dt
+from src.dump.constants import m_tot, V_tot, T_end, t, T_cf, Q_in, cp_cf, m_cf, S, dt
 
 
 T_N2O = [271.53677] #K

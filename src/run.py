@@ -1,55 +1,42 @@
-import time
-from copy import deepcopy
-import matplotlib as mpl
-mpl.use('Qt5Agg')
-from matplotlib import pyplot as plt
+from mpl_plotter.two_d import line
 
 from src.tank_temp import Tank, Lamp, Thermals
+from src import constants as c
 from src.n2o_class import N2O
 
+from alexandria.math.differentiation import derivative
 
-# tank data
-k_carbon = 10           # W/m/K
-k_alu = 200             # W/m/K
-t_carbon = 2e-3         # m
-t_alu = 3e-3            # m
-A_tank = 4              # m^2
-p_max = 7000            # kpa
 
-# lamp data
-shape_factor = 0.00269
-emissivity = 0.6
-lamp_temp = 350         # K
-
-# sim data
-T = 100                # s
-dt = 0.001              # s  0.001 for stability if evap is considered
-T0 = 288                # K
+# Setup
+T     = 2*60**2       # s
+dt    = 0.1           # s  0.001 for stability if evap is considered
+T_amb = 288           # K
 
 
 if __name__ == '__main__':
 
-    tank = Tank(k_carbon, t_carbon, k_alu, t_alu, A_tank)
-    lamp = Lamp(emissivity, lamp_temp, shape_factor)
+    tank = Tank()
+    lamp = Lamp()
     n2o = N2O()
 
-    t0 = time.time()
-    thermals = Thermals(tank, lamp, n2o, T, dt, T0, evap=True)
+    thermals = Thermals(tank=Tank(),
+                        lamp=Lamp(),
+                        n2o=N2O(),
+                        T=T,
+                        dt=dt,
+                        T_amb=T_amb,
+                        evap=False)
 
-    t1, t2 = deepcopy(thermals), deepcopy(thermals)
+    thermals.forward_euler(c.p_max)
 
-    t1.forward_euler(p_max)
-    runtime1 = time.time()
-
-    print('run time: ', runtime1 - t0, ' seconds')
-
-    t2.runge_kutta4(p_max)
-    runtime2 = time.time()
-
-    print('run time: ', runtime2 - t0, ' seconds')
-
-    plt.plot(t1.time, t1.T_tank)
-    plt.plot(t2.time, t2.T_tank)
-    plt.xlabel('time [s]')
-    plt.ylabel('temp [K]')
-    plt.show()
+    line(thermals.time/60,
+         thermals.T_tank,
+         # thermals.n2o.p(thermals.T_tank)/100,
+         # derivative(thermals.time/60/60, thermals.n2o.p(thermals.T_tank)/100),
+         # x_label='Time [min]',
+         # y_label='Temp [K]',
+         # y_bounds=[0, 60],
+         y_bounds=[280, 302],
+         color='C2',
+         show=True
+         )
