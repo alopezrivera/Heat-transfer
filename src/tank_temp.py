@@ -81,9 +81,9 @@ class Thermals():
         """
         if T_cf0 - c.T_amb > 0:
             h_r = c.sigma * f_12 * (T_cf0 - c.T_amb)**4/(T_cf0 - c.T_amb)
-            return 1/(h_r*c.S)
+            return 1/(h_r*c.S_lamp)
         else:
-            return 0
+            return 10e99
 
     def R_cf(self):
         """
@@ -117,7 +117,7 @@ class Thermals():
         """
         Heat flux
         """
-        return (self.lamp.T - T_alu1)/self.R_tot(T_cf0)
+        return c.n_lamps * (self.lamp.T - T_alu1)/self.R_tot(T_cf0)
 
     def dT(self,
            T_tank,
