@@ -27,10 +27,10 @@ if __name__ == '__main__':
                         T_amb=T_amb,
                         evap=False)
 
-    thermals.forward_euler(c.p_max)
+    thermals.simulate(c.p_max)
 
-    line(thermals.time/60,
-         thermals.T_tank,
+    line(thermals.t/60,
+         thermals.T_n2o,
          # thermals.n2o.p(thermals.T_tank)/100,
          # derivative(thermals.time/60/60, thermals.n2o.p(thermals.T_tank)/100),
          # x_label='Time [min]',

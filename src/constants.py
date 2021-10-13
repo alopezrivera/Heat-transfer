@@ -38,10 +38,17 @@ T_cf  = [T_amb]                 # K
 q_cf  = [0.]                    # W/m2
 
 # Lamp data
-shape_factor = 0.015
-# shape_factor = 0.969
 emissivity   = 0.6
-lamp_temp    = 350              # K
+T_lamp       = 350                              # K
+L_lamp       = 0.73                             # m     Length of the lamp
+W_lamp       = 0.05                             # m     "Width" of the lamp
+D_lamp       = 0.1                              # m     Distance from cylinder
+c_lamp       = D_lamp                           # m     Area illuminated by the lamp: cord of the tank
+s_lamp       = 2*d/2*np.arcsin(c_lamp/2/d/2)    # m     Area illuminated by the lamp: distance along surface of cylinder
+S_lamp       = L_lamp*s_lamp                    # m^2   Area illuminated by the lamp: area
+
+shape_factor = (c_lamp/2/d/2)**2                # -     sin(theta)**2 [Mills and Coimbra, Table 6.1, entry 12]
 
 # Radiation
 sigma        = 5.67e-8          # W/m^2/K^4
+epsilon      = 0.5
